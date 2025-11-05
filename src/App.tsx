@@ -2,6 +2,7 @@ import React from 'react'
 import { useChatStore, flattenChats } from './store'
 import { Message, Attachment } from './types'
 import Loader from './Loader'
+import { generateStream } from './api'
 
 function flattenFolders(tree: any[]): { id: string, name: string }[] {
   const out: { id: string, name: string }[] = []
@@ -28,7 +29,7 @@ export default function App() {
     minimap: true
   })
 
-  const { tree, currentFolderId, search, setSearch, enterFolder, addChat, addFolder, renameChat, renameFolder, deleteChat, deleteFolder, moveChatUp, moveChatDown, moveChatToFolder, moveChatBefore } = useChatStore()
+  const { tree, currentFolderId, search, setSearch, enterFolder, addChat, addFolder, renameChat, renameFolder, deleteChat, deleteFolder, moveChatUp, moveChatDown, moveChatToFolder, moveChatBefore, modelSettings, setModelSettings } = useChatStore()
 
   // Separate chats from folders
   const chatsOnly = React.useMemo(() => tree.filter(n => n.type === 'chat'), [tree])
@@ -48,7 +49,17 @@ export default function App() {
     if (!files) return
     const next: Attachment[] = []
     for (const f of Array.from(files)) {
-      next.push({ id: `${f.name}-${f.size}-${crypto.randomUUID?.() ?? Math.random()}`, name: f.name, type: f.type || 'application/octet-stream', size: f.size })
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string
+        setAttachments(prev => prev.map(a => 
+          a.id === `${f.name}-${f.size}` 
+            ? { ...a, url: base64.split(',')[1] } 
+            : a
+        ))
+      }
+      reader.readAsDataURL(f)
+      next.push({ id: `${f.name}-${f.size}`, name: f.name, type: f.type || 'application/octet-stream', size: f.size })
     }
     setAttachments(prev => [...prev, ...next])
   }
@@ -65,25 +76,47 @@ export default function App() {
     setInput('')
     setAttachments([])
 
-    // Start generation
     setIsGenerating(true)
     generationAbortRef.current = new AbortController()
     const controller = generationAbortRef.current
-
-    // Simulated AI response streaming
-    const chunks = ['Sto elaborando la tua richiesta', ' e preparo un design', ' in stile Apple minimal.', ' Fatto!']
-    let acc = ''
     const assistantId = `a_${Date.now()}`
-    setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '…' }])
+    let acc = ''
+    const images: string[] = []
 
-    for (const piece of chunks) {
-      if (controller.signal.aborted) break
-      await new Promise(r => setTimeout(r, 600))
-      acc += piece
-      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: acc } : m))
+    try {
+      setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '', images: [] }])
+      
+      for await (const chunk of generateStream(
+        modelSettings.model,
+        text,
+        {
+          temperature: modelSettings.temperature,
+          topP: modelSettings.topP,
+          maxTokens: modelSettings.maxTokens,
+          safetyOff: modelSettings.safetyOff,
+          customInstructions: modelSettings.customInstructions
+        },
+        attachments
+      )) {
+        if (controller.signal.aborted) break
+        
+        if (chunk.type === 'text' && chunk.content) {
+          acc += chunk.content
+          setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: acc } : m))
+        } else if (chunk.type === 'image' && chunk.data) {
+          images.push(`data:${chunk.mimeType};base64,${chunk.data}`)
+          setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, images } : m))
+        } else if (chunk.type === 'done') {
+          break
+        }
+      }
+    } catch (error) {
+      console.error('Generation error:', error)
+      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: `Errore: ${error instanceof Error ? error.message : 'Errore sconosciuto'}` } : m))
+    } finally {
+      setIsGenerating(false)
+      generationAbortRef.current = null
     }
-    setIsGenerating(false)
-    generationAbortRef.current = null
   }
 
   function stopGeneration() {
@@ -416,6 +449,26 @@ export default function App() {
                         <>
                           <div className="max-w-prose text-text">
                             <div>{m.content}</div>
+                            {m.images && m.images.length > 0 && (
+                              <div className="mt-2 flex flex-col gap-2">
+                                {m.images.map((img, idx) => (
+                                  <div key={idx} className="relative">
+                                    <img src={img} alt={`Generated ${idx + 1}`} className="max-w-full rounded-lg border border-border" />
+                                    <button 
+                                      className="absolute top-2 right-2 btn text-xs"
+                                      onClick={() => {
+                                        const link = document.createElement('a')
+                                        link.href = img
+                                        link.download = `image-${Date.now()}.png`
+                                        link.click()
+                                      }}
+                                    >
+                                      ⬇️
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             {m.attachments && m.attachments.length > 0 && (
                               <div className="mt-2 flex flex-wrap gap-2">
                                 {m.attachments.map(a => (
@@ -436,23 +489,48 @@ export default function App() {
                                 const msgIndex = messages.findIndex(msg => msg.id === m.id)
                                 const prevMsg = messages[msgIndex - 1]
                                 if (prevMsg && prevMsg.role === 'user') {
-                                  // Remove current AI response and regenerate
                                   setMessages(prev => prev.filter((msg, idx) => idx < msgIndex))
                                   setIsGenerating(true)
                                   generationAbortRef.current = new AbortController()
                                   const controller = generationAbortRef.current
-                                  const chunks = ['Rigenerazione in corso', ' e preparo una nuova risposta', ' basata sulla tua richiesta.', ' Fatto!']
-                                  let acc = ''
                                   const assistantId = `a_${Date.now()}`
-                                  setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '…' }])
-                                  for (const piece of chunks) {
-                                    if (controller.signal.aborted) break
-                                    await new Promise(r => setTimeout(r, 600))
-                                    acc += piece
-                                    setMessages(prev => prev.map(msg => msg.id === assistantId ? { ...msg, content: acc } : msg))
+                                  let acc = ''
+                                  const images: string[] = []
+
+                                  try {
+                                    setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '', images: [] }])
+                                    
+                                    for await (const chunk of generateStream(
+                                      modelSettings.model,
+                                      prevMsg.content,
+                                      {
+                                        temperature: modelSettings.temperature,
+                                        topP: modelSettings.topP,
+                                        maxTokens: modelSettings.maxTokens,
+                                        safetyOff: modelSettings.safetyOff,
+                                        customInstructions: modelSettings.customInstructions
+                                      },
+                                      prevMsg.attachments
+                                    )) {
+                                      if (controller.signal.aborted) break
+                                      
+                                      if (chunk.type === 'text' && chunk.content) {
+                                        acc += chunk.content
+                                        setMessages(prev => prev.map(msg => msg.id === assistantId ? { ...msg, content: acc } : msg))
+                                      } else if (chunk.type === 'image' && chunk.data) {
+                                        images.push(`data:${chunk.mimeType};base64,${chunk.data}`)
+                                        setMessages(prev => prev.map(msg => msg.id === assistantId ? { ...msg, images } : msg))
+                                      } else if (chunk.type === 'done') {
+                                        break
+                                      }
+                                    }
+                                  } catch (error) {
+                                    console.error('Regeneration error:', error)
+                                    setMessages(prev => prev.map(msg => msg.id === assistantId ? { ...msg, content: `Errore: ${error instanceof Error ? error.message : 'Errore sconosciuto'}` } : msg))
+                                  } finally {
+                                    setIsGenerating(false)
+                                    generationAbortRef.current = null
                                   }
-                                  setIsGenerating(false)
-                                  generationAbortRef.current = null
                                 }
                               }} title="Rigenera">
                                 🔄
@@ -516,7 +594,11 @@ export default function App() {
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-semibold">Impostazioni del modello</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-panel-2 text-dim">gemini-2.5-flash-preview</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-panel-2 text-dim">
+                          {modelSettings.model === 'NANOBANANA' ? 'nanobanana' : 
+                           modelSettings.model === 'GEMINI_25_FLASH_PREVIEW' ? 'gemini-2.5-flash-preview' : 
+                           'imagen'}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-dim">⋯</span>
@@ -527,26 +609,70 @@ export default function App() {
                       <div className="px-4 pb-4 space-y-3">
                         <div>
                           <label className="block text-xs text-dim mb-1">Modello</label>
-                          <select className="input w-full">
-                            <option>NANOBANANA</option>
-                            <option>gemini-2.5-flash-preview</option>
-                            <option>Imagen</option>
+                          <select 
+                            className="input w-full" 
+                            value={modelSettings.model}
+                            onChange={e => setModelSettings({ model: e.target.value as any })}
+                          >
+                            <option value="NANOBANANA">NANOBANANA</option>
+                            <option value="GEMINI_25_FLASH_PREVIEW">Gemini 2.5 Flash Preview</option>
+                            <option value="IMAGEN">Imagen</option>
                           </select>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs text-dim mb-1">Temperatura</label>
-                            <input type="number" className="input w-full" defaultValue={1} step="0.1" />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-dim mb-1">Top‑p</label>
-                            <input type="number" className="input w-full" defaultValue={0.95} step="0.05" />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-dim mb-1">Max tokens</label>
-                            <input type="number" className="input w-full" defaultValue={2048} />
-                          </div>
-                        </div>
+                        {(modelSettings.model === 'NANOBANANA' || modelSettings.model === 'GEMINI_25_FLASH_PREVIEW') && (
+                          <>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs text-dim mb-1">Temperatura</label>
+                                <input 
+                                  type="number" 
+                                  className="input w-full" 
+                                  value={modelSettings.temperature}
+                                  onChange={e => setModelSettings({ temperature: parseFloat(e.target.value) })}
+                                  step="0.1" 
+                                  min="0" 
+                                  max="2"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-dim mb-1">Top‑p</label>
+                                <input 
+                                  type="number" 
+                                  className="input w-full" 
+                                  value={modelSettings.topP}
+                                  onChange={e => setModelSettings({ topP: parseFloat(e.target.value) })}
+                                  step="0.05" 
+                                  min="0" 
+                                  max="1"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-dim mb-1">Max tokens</label>
+                                <input 
+                                  type="number" 
+                                  className="input w-full" 
+                                  value={modelSettings.maxTokens}
+                                  onChange={e => setModelSettings({ maxTokens: parseInt(e.target.value) })}
+                                  min="1" 
+                                  max="32768"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-dim mb-1 flex items-center gap-2">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={modelSettings.safetyOff || false}
+                                    onChange={e => setModelSettings({ safetyOff: e.target.checked })}
+                                  />
+                                  <span>Disabilita safety</span>
+                                </label>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        {modelSettings.model === 'IMAGEN' && (
+                          <div className="text-sm text-dim">Configurazioni Imagen (da implementare)</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -568,7 +694,8 @@ export default function App() {
                         <textarea
                           className="input w-full min-h-[100px] resize-none"
                           placeholder="Fornisci al modello un contesto per comprendere l'attività e fornire risposte su misura"
-                          defaultValue="Fornisci al modello un contesto per comprendere l'attività e fornire risposte su misura"
+                          value={modelSettings.customInstructions || ''}
+                          onChange={e => setModelSettings({ customInstructions: e.target.value })}
                         />
                       </div>
                     )}

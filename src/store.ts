@@ -3,10 +3,22 @@ import { Chat, Folder, Message, RootTree } from './types'
 
 function uid(prefix = 'id'): string { return `${prefix}_${Math.random().toString(36).slice(2, 9)}` }
 
+type ModelId = 'NANOBANANA' | 'GEMINI_25_FLASH_PREVIEW' | 'IMAGEN'
+
+type ModelSettings = {
+  model: ModelId
+  temperature: number
+  topP: number
+  maxTokens: number
+  safetyOff?: boolean
+  customInstructions?: string
+}
+
 type State = {
   tree: RootTree
   currentFolderId: string | null
   search: string
+  modelSettings: ModelSettings
 }
 
 type Actions = {
@@ -22,6 +34,7 @@ type Actions = {
   moveChatDown: (chatId: string) => void
   moveChatToFolder: (chatId: string, targetFolderId: string | null) => void
   moveChatBefore: (chatId: string, beforeChatId: string) => void
+  setModelSettings: (settings: Partial<ModelSettings>) => void
 }
 
 function now() { return Date.now() }
@@ -70,9 +83,17 @@ export const useChatStore = create<State & Actions>((set, get) => ({
   tree: createInitialData(),
   currentFolderId: null,
   search: '',
+  modelSettings: {
+    model: 'GEMINI_25_FLASH_PREVIEW',
+    temperature: 1,
+    topP: 0.95,
+    maxTokens: 32768,
+    safetyOff: false,
+  },
 
   setSearch: (q) => set({ search: q }),
   enterFolder: (folderId) => set({ currentFolderId: folderId }),
+  setModelSettings: (settings) => set(state => ({ modelSettings: { ...state.modelSettings, ...settings } })),
 
   addChat: () => set(state => {
     const nowTime = now()
@@ -126,7 +147,6 @@ export const useChatStore = create<State & Actions>((set, get) => ({
     if (!loc) return {}
     const list = loc.parent ? loc.parent.children : updated
     list.splice(loc.index, 1)
-    // If we were inside this folder, go to root
     if (state.currentFolderId === folderId) return { tree: updated, currentFolderId: null }
     return { tree: updated }
   }),
@@ -201,5 +221,3 @@ export function flattenChats(tree: RootTree): Chat[] {
   walk(tree)
   return out
 }
-
-
