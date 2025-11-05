@@ -19,9 +19,19 @@ function flattenFolders(tree: any[]): { id: string, name: string }[] {
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = React.useState(true)
+  const [foldersSidebarOpen, setFoldersSidebarOpen] = React.useState(false)
   const [settingsOpen, setSettingsOpen] = React.useState(false)
+  const [settingsSections, setSettingsSections] = React.useState({
+    model: false,
+    system: true,
+    minimap: true
+  })
 
   const { tree, currentFolderId, search, setSearch, enterFolder, addChat, addFolder, renameChat, renameFolder, deleteChat, deleteFolder, moveChatUp, moveChatDown, moveChatToFolder, moveChatBefore } = useChatStore()
+
+  // Separate chats from folders
+  const chatsOnly = React.useMemo(() => tree.filter(n => n.type === 'chat'), [tree])
+  const foldersOnly = React.useMemo(() => flattenFolders(tree), [tree])
 
   // Chat state (per demo - later bind to selected chat from store)
   const [messages, setMessages] = React.useState<Message[]>([
@@ -30,6 +40,7 @@ export default function App() {
   const [input, setInput] = React.useState('')
   const [attachments, setAttachments] = React.useState<Attachment[]>([])
   const [isGenerating, setIsGenerating] = React.useState(false)
+  const [editingMessageId, setEditingMessageId] = React.useState<string | null>(null)
   const generationAbortRef = React.useRef<AbortController | null>(null)
 
   function onAttachFiles(files: FileList | null) {
@@ -164,64 +175,84 @@ export default function App() {
             <input className="input pl-9" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca chat e contenuti..." />
           </div>
         </div>
-        <div className="flex-1 overflow-auto px-3 pb-3 divide-y divide-border min-h-0">
-          {currentFolderId && (
-            <div className="text-xs text-dim px-1 py-2">
-              <button className="btn" onClick={() => enterFolder(null)}>← Indietro</button>
+        <div className="flex-1 overflow-auto px-3 pb-3 min-h-0">
+          {/* Chat section */}
+          <div className="mb-4">
+            <div className="text-xs font-semibold text-dim uppercase tracking-wide mb-2 px-1">Chat</div>
+            <div className="divide-y divide-border">
+              {chatsOnly.map((n: any) => (
+                <div
+                  key={n.id}
+                  className="py-2 flex items-center justify-between group"
+                  draggable
+                  onDragStart={(e) => { setDragChatId(n.id); e.dataTransfer.setData('text/plain', n.id) }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); const src = dragChatId || e.dataTransfer.getData('text/plain'); if (src && src !== n.id) moveChatBefore(src, n.id); setDragChatId(null) }}
+                >
+                  <button className="text-sm text-left truncate flex-1" onClick={() => {/* future: open chat */}}>{n.title}</button>
+                  <div className="ml-2 relative" ref={openMenuId === n.id ? menuRef : undefined}>
+                    <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === n.id ? null : n.id)} aria-label="Altro">⋯</button>
+                    {openMenuId === n.id && (
+                      <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
+                        <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); promptRenameChat(n.id, n.title) }}>Rinomina</button>
+                        <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatUp(n.id) }}>Sposta su</button>
+                        <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatDown(n.id) }}>Sposta giù</button>
+                        <div className="px-3 pt-2 pb-1 text-xs text-dim">Muovi in</div>
+                        <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatToFolder(n.id, null) }}>Radice</button>
+                        {flattenFolders(tree).map(f => (
+                          <button key={f.id} className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatToFolder(n.id, f.id) }}>{f.name}</button>
+                        ))}
+                        <div className="border-t border-border my-1" />
+                        <button className="w-full text-left px-3 py-2 hover:bg-panel-2 text-red-400" onClick={() => { setOpenMenuId(null); deleteChat(n.id) }}>Elimina</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
-          {(currentList as any[]).map((n: any, index: number) => (
-            n.type === 'chat' ? (
-              <div
-                key={n.id}
-                className="py-2 flex items-center justify-between group"
-                draggable
-                onDragStart={(e) => { setDragChatId(n.id); e.dataTransfer.setData('text/plain', n.id) }}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => { e.preventDefault(); const src = dragChatId || e.dataTransfer.getData('text/plain'); if (src && src !== n.id) moveChatBefore(src, n.id); setDragChatId(null) }}
-              >
-                <button className="text-sm text-left truncate flex-1" onClick={() => {/* future: open chat */}}>{n.title}</button>
-                <div className="ml-2 relative" ref={openMenuId === n.id ? menuRef : undefined}>
-                  <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === n.id ? null : n.id)} aria-label="Altro">⋯</button>
-                  {openMenuId === n.id && (
-                    <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
-                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); promptRenameChat(n.id, n.title) }}>Rinomina</button>
-                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatUp(n.id) }}>Sposta su</button>
-                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatDown(n.id) }}>Sposta giù</button>
-                      <div className="px-3 pt-2 pb-1 text-xs text-dim">Muovi in</div>
-                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatToFolder(n.id, null) }}>Radice</button>
-                      {flattenFolders(tree).map(f => (
-                        <button key={f.id} className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatToFolder(n.id, f.id) }}>{f.name}</button>
-                      ))}
-                      <div className="border-t border-border my-1" />
-                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2 text-red-400" onClick={() => { setOpenMenuId(null); deleteChat(n.id) }}>Elimina</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div
-                key={n.id}
-                className="py-2 flex items-center justify-between"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => { e.preventDefault(); const src = dragChatId || e.dataTransfer.getData('text/plain'); if (src) moveChatToFolder(src, n.id); setDragChatId(null) }}
-              >
-                <button className="text-sm font-medium text-left truncate flex-1" onClick={() => enterFolder(n.id)}>{n.name}</button>
-                <div className="ml-2 relative" ref={openMenuId === n.id ? menuRef : undefined}>
-                  <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === n.id ? null : n.id)} aria-label="Altro">⋯</button>
-                  {openMenuId === n.id && (
-                    <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
-                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); promptRenameFolder(n.id, n.name) }}>Rinomina</button>
-                      <div className="border-t border-border my-1" />
-                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2 text-red-400" onClick={() => { setOpenMenuId(null); deleteFolder(n.id) }}>Elimina</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          ))}
+          </div>
+
+          {/* Folders section */}
+          <div>
+            <button className="w-full flex items-center justify-between px-1 py-2 mb-2 hover:bg-panel-2 rounded" onClick={() => setFoldersSidebarOpen(true)}>
+              <div className="text-xs font-semibold text-dim uppercase tracking-wide">Cartelle</div>
+              <span className="text-dim">→</span>
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Folders sidebar (secondary) */}
+      {foldersSidebarOpen && (
+        <div className="fixed inset-y-0 left-[280px] z-30 w-[280px] transform bg-panel border-r border-border shadow-soft transition-transform duration-200 flex flex-col">
+          <div className="flex items-center justify-between px-3 py-3 border-b border-border flex-shrink-0">
+            <span className="text-sm font-medium">Cartelle</span>
+            <button className="btn px-2 py-1" aria-label="Chiudi" onClick={() => setFoldersSidebarOpen(false)}>✕</button>
+          </div>
+          <div className="flex-1 overflow-auto px-3 pb-3 divide-y divide-border min-h-0">
+            {tree.filter((n: any) => n.type === 'folder').map((f: any) => (
+              <div
+                key={f.id}
+                className="py-2 flex items-center justify-between group"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); const src = dragChatId || e.dataTransfer.getData('text/plain'); if (src) moveChatToFolder(src, f.id); setDragChatId(null) }}
+              >
+                <button className="text-sm font-medium text-left truncate flex-1" onClick={() => enterFolder(f.id)}>{f.name}</button>
+                <div className="ml-2 relative" ref={openMenuId === f.id ? menuRef : undefined}>
+                  <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === f.id ? null : f.id)} aria-label="Altro">⋯</button>
+                  {openMenuId === f.id && (
+                    <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
+                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); promptRenameFolder(f.id, f.name) }}>Rinomina</button>
+                      <div className="border-t border-border my-1" />
+                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2 text-red-400" onClick={() => { setOpenMenuId(null); deleteFolder(f.id) }}>Elimina</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Reopen sidebar button when closed */}
       {!sidebarOpen && (
@@ -243,8 +274,8 @@ export default function App() {
         />
       )}
 
-      {/* Chat area: shifts on desktop when sidebar open */}
-      <div className={`h-full grid grid-rows-[auto,1fr,auto] transition-[margin] duration-200 ${sidebarOpen ? 'md:ml-[280px]' : ''}`}>
+      {/* Chat area: shifts on desktop when sidebar(s) open */}
+      <div className={`h-full grid grid-rows-[auto,1fr,auto] transition-[margin] duration-200 ${sidebarOpen && foldersSidebarOpen ? 'md:ml-[560px]' : sidebarOpen ? 'md:ml-[280px]' : ''}`}>
         <header className="px-4 py-3 flex items-center justify-between border-b border-border">
           <div className="flex items-center gap-2">
             {sidebarOpen ? (
@@ -267,16 +298,67 @@ export default function App() {
                   ) : (
                     <>
                       {m.role === 'user' ? (
-                        <div className="max-w-prose rounded-lg bg-accent text-white p-3 shadow-sm">
-                          <div>{m.content}</div>
-                          {m.attachments && m.attachments.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {m.attachments.map(a => (
-                                <span key={a.id} className="px-2 py-1 text-xs rounded-full bg-white/20 text-white">{a.name}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        <>
+                          <div className="max-w-prose rounded-lg bg-accent text-white p-3 shadow-sm">
+                            {editingMessageId === m.id ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  className="w-full bg-white/10 border border-white/20 rounded px-2 py-1 text-white placeholder-white/60 resize-none"
+                                  value={input}
+                                  onChange={e => setInput(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                      e.preventDefault()
+                                      setMessages(prev => prev.map(msg => msg.id === m.id ? { ...msg, content: input } : msg))
+                                      setEditingMessageId(null)
+                                      setInput('')
+                                    }
+                                    if (e.key === 'Escape') {
+                                      setEditingMessageId(null)
+                                      setInput('')
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                                <div className="flex gap-2 text-xs">
+                                  <button className="px-2 py-1 bg-white/20 rounded hover:bg-white/30" onClick={() => {
+                                    setMessages(prev => prev.map(msg => msg.id === m.id ? { ...msg, content: input } : msg))
+                                    setEditingMessageId(null)
+                                    setInput('')
+                                  }}>Salva</button>
+                                  <button className="px-2 py-1 bg-white/20 rounded hover:bg-white/30" onClick={() => {
+                                    setEditingMessageId(null)
+                                    setInput('')
+                                  }}>Annulla</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div>{m.content}</div>
+                                {m.attachments && m.attachments.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {m.attachments.map(a => (
+                                      <span key={a.id} className="px-2 py-1 text-xs rounded-full bg-white/20 text-white">{a.name}</span>
+                                    ))}
+                                  </div>
+                                )}
+                                <div className="mt-2 flex gap-2">
+                                  <button className="copy" onClick={() => navigator.clipboard.writeText(m.content)} title="Copia">
+                                    <svg className="clipboard" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6.35 6.35" aria-hidden>
+                                      <path d="M2.43.265c-.3 0-.548.236-.573.53h-.328a.74.74 0 0 0-.735.734v3.822a.74.74 0 0 0 .735.734H4.82a.74.74 0 0 0 .735-.734V1.529a.74.74 0 0 0-.735-.735h-.328a.58.58 0 0 0-.573-.53zm0 .529h1.49c.032 0 .049.017.049.049v.431c0 .032-.017.049-.049.049H2.43c-.032 0-.05-.017-.05-.049V.843c0-.032.018-.05.05-.05zm-.901.53h.328c.026.292.274.528.573.528h1.49a.58.58 0 0 0 .573-.529h.328a.2.2 0 0 1 .206.206v3.822a.2.2 0 0 1-.206.205H1.53a.2.2 0 0 1-.206-.205V1.529a.2.2 0 0 1 .206-.206z" fill="currentColor"/>
+                                    </svg>
+                                    <svg className="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
+                                      <path d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z" fill="currentColor"/>
+                                    </svg>
+                                  </button>
+                                  <button className="action-btn-minimal" onClick={() => { setEditingMessageId(m.id); setInput(m.content) }} title="Modifica">
+                                    ✏️
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </>
                       ) : (
                         <>
                           <div className="max-w-prose text-text">
@@ -296,6 +378,31 @@ export default function App() {
                                 <svg className="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
                                   <path d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z" fill="currentColor"/>
                                 </svg>
+                              </button>
+                              <button className="action-btn-minimal" onClick={async () => {
+                                const msgIndex = messages.findIndex(msg => msg.id === m.id)
+                                const prevMsg = messages[msgIndex - 1]
+                                if (prevMsg && prevMsg.role === 'user') {
+                                  // Remove current AI response and regenerate
+                                  setMessages(prev => prev.filter((msg, idx) => idx < msgIndex))
+                                  setIsGenerating(true)
+                                  generationAbortRef.current = new AbortController()
+                                  const controller = generationAbortRef.current
+                                  const chunks = ['Rigenerazione in corso', ' e preparo una nuova risposta', ' basata sulla tua richiesta.', ' Fatto!']
+                                  let acc = ''
+                                  const assistantId = `a_${Date.now()}`
+                                  setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '…' }])
+                                  for (const piece of chunks) {
+                                    if (controller.signal.aborted) break
+                                    await new Promise(r => setTimeout(r, 600))
+                                    acc += piece
+                                    setMessages(prev => prev.map(msg => msg.id === assistantId ? { ...msg, content: acc } : msg))
+                                  }
+                                  setIsGenerating(false)
+                                  generationAbortRef.current = null
+                                }
+                              }} title="Rigenera">
+                                🔄
                               </button>
                               <button className="delete-btn" onClick={() => setMessages(prev => prev.filter(x => x.id !== m.id))} title="Elimina">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 69 14" className="svgIcon bin-top">
@@ -341,38 +448,93 @@ export default function App() {
                 ⚙︎ Modello
               </button>
               {settingsOpen && (
-                <div className="absolute right-0 mt-2 w-[320px] rounded-xl border border-border bg-panel p-3 shadow-soft">
-                  <div className="mb-2">
-                    <h2 className="text-sm font-semibold">Impostazioni modello</h2>
-                    <p className="text-xs text-dim">Scegli modello e parametri</p>
+                <div className="absolute right-0 mt-2 w-[400px] rounded-xl border border-border bg-panel shadow-soft overflow-hidden">
+                  {/* Header */}
+                  <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                    <h2 className="text-sm font-semibold">Impostazioni</h2>
+                    <button className="text-dim hover:text-text" onClick={() => setSettingsOpen(false)}>✕</button>
                   </div>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs text-dim mb-1">Modello</label>
-                      <select className="input">
-                        <option>NANOBANANA</option>
-                        <option>GEMINI 2.5 Flash Preview</option>
-                        <option>Imagen</option>
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-dim mb-1">Temperatura</label>
-                        <input type="number" className="input" defaultValue={1} step="0.1" />
+                  
+                  {/* Model settings section */}
+                  <div className="border-b border-border">
+                    <button
+                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-panel-2 transition"
+                      onClick={() => setSettingsSections({ ...settingsSections, model: !settingsSections.model })}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-semibold">Impostazioni del modello</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-panel-2 text-dim">gemini-2.5-flash-preview</span>
                       </div>
-                      <div>
-                        <label className="block text-xs text-dim mb-1">Top‑p</label>
-                        <input type="number" className="input" defaultValue={0.95} step="0.05" />
+                      <div className="flex items-center gap-2">
+                        <span className="text-dim">⋯</span>
+                        <span className="text-dim">{settingsSections.model ? '▲' : '▼'}</span>
                       </div>
-                      <div>
-                        <label className="block text-xs text-dim mb-1">Max tokens</label>
-                        <input type="number" className="input" defaultValue={2048} />
+                    </button>
+                    {settingsSections.model && (
+                      <div className="px-4 pb-4 space-y-3">
+                        <div>
+                          <label className="block text-xs text-dim mb-1">Modello</label>
+                          <select className="input w-full">
+                            <option>NANOBANANA</option>
+                            <option>gemini-2.5-flash-preview</option>
+                            <option>Imagen</option>
+                          </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-dim mb-1">Temperatura</label>
+                            <input type="number" className="input w-full" defaultValue={1} step="0.1" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-dim mb-1">Top‑p</label>
+                            <input type="number" className="input w-full" defaultValue={0.95} step="0.05" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-dim mb-1">Max tokens</label>
+                            <input type="number" className="input w-full" defaultValue={2048} />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs text-dim mb-1">Custom instructions</label>
-                        <input type="text" className="input" placeholder="Es. rispondi conciso" />
+                    )}
+                  </div>
+
+                  {/* System instructions section */}
+                  <div className="border-b border-border">
+                    <button
+                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-panel-2 transition"
+                      onClick={() => setSettingsSections({ ...settingsSections, system: !settingsSections.system })}
+                    >
+                      <span className="text-sm font-semibold">Istruzioni di sistema</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-dim">⋯</span>
+                        <span className="text-dim">{settingsSections.system ? '▲' : '▼'}</span>
                       </div>
-                    </div>
+                    </button>
+                    {settingsSections.system && (
+                      <div className="px-4 pb-4">
+                        <textarea
+                          className="input w-full min-h-[100px] resize-none"
+                          placeholder="Fornisci al modello un contesto per comprendere l'attività e fornire risposte su misura"
+                          defaultValue="Fornisci al modello un contesto per comprendere l'attività e fornire risposte su misura"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mini map section */}
+                  <div>
+                    <button
+                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-panel-2 transition"
+                      onClick={() => setSettingsSections({ ...settingsSections, minimap: !settingsSections.minimap })}
+                    >
+                      <span className="text-sm font-semibold">Mini mappa</span>
+                      <span className="text-dim">{settingsSections.minimap ? '▲' : '▼'}</span>
+                    </button>
+                    {settingsSections.minimap && (
+                      <div className="px-4 pb-4">
+                        <p className="text-sm text-dim">Utilizza l'input del prompt per avviare una conversazione.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
