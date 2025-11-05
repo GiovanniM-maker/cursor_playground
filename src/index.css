@@ -69,82 +69,80 @@
 @keyframes roundness { 0% { filter: contrast(15); } 20% { filter: contrast(3); } 40% { filter: contrast(3); } 60% { filter: contrast(15); } 100% { filter: contrast(15); } }
 @keyframes colorize { 0% { filter: hue-rotate(0deg); } 20% { filter: hue-rotate(-30deg); } 40% { filter: hue-rotate(-60deg); } 60% { filter: hue-rotate(-90deg); } 80% { filter: hue-rotate(-45deg); } 100% { filter: hue-rotate(0deg); } }
 
-/* Minimal copy button with tooltip (inspired by snippet) */
+/* Minimal copy button - circular on hover */
 .copy {
-  --button-bg: #1a1a1c;
-  --button-hover-bg: #222224;
+  --button-bg: #2a2a2e;
+  --button-hover-bg: #3a3a3f;
   --button-text-color: #9ca3af;
   --button-hover-text-color: #0a84ff;
-  --button-border-radius: 10px;
   --button-diameter: 36px;
-  --button-outline-width: 1px;
-  --button-outline-color: rgb(141, 141, 141);
-  --tooltip-bg: #2a2a2e;
-  --toolptip-border-radius: 6px;
-  --tooltip-font-family: Menlo, Roboto Mono, monospace;
-  --tooltip-font-size: 12px;
-  --tootip-text-color: #eaeaea;
-  --tooltip-padding-x: 7px;
-  --tooltip-padding-y: 7px;
-  --tooltip-offset: 8px;
   box-sizing: border-box;
   width: var(--button-diameter);
   height: var(--button-diameter);
-  border-radius: var(--button-border-radius);
+  border-radius: 10px;
   background-color: var(--button-bg);
   color: var(--button-text-color);
   border: none;
   cursor: pointer;
   position: relative;
   outline: none;
-}
-.copy .tooltip {
-  position: absolute;
-  opacity: 0;
-  visibility: hidden;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font: var(--tooltip-font-size) var(--tooltip-font-family);
-  color: var(--tootip-text-color);
-  background: var(--tooltip-bg);
-  padding: var(--tooltip-padding-y) var(--tooltip-padding-x);
-  border-radius: var(--toolptip-border-radius);
-  pointer-events: none;
-}
-.copy .tooltip::before { content: attr(data-text-initial); }
-.copy .tooltip::after {
-  content: "";
-  position: absolute;
-  bottom: calc(var(--tooltip-padding-y) / 2 * -1);
-  width: var(--tooltip-padding-y);
-  height: var(--tooltip-padding-y);
-  background: inherit;
-  left: 50%;
-  transform: translateX(-50%) rotate(45deg);
-  z-index: -1;
-  pointer-events: none;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .copy svg {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
 }
 .copy .checkmark { display: none; }
-.copy:hover .tooltip,
-.copy:focus:not(:focus-visible) .tooltip {
-  opacity: 1;
-  visibility: visible;
-  top: calc((100% + var(--tooltip-offset)) * -1);
+.copy:hover {
+  border-radius: 50%;
+  background-color: var(--button-hover-bg);
 }
-.copy:focus:not(:focus-visible) .tooltip::before { content: attr(data-text-end); }
+.copy:hover svg { color: var(--button-hover-text-color); }
 .copy:focus:not(:focus-visible) .clipboard { display: none; }
 .copy:focus:not(:focus-visible) .checkmark { display: block; }
-.copy:hover,
-.copy:focus { background-color: var(--button-hover-bg); }
-.copy:active { outline: var(--button-outline-width) solid var(--button-outline-color); }
-.copy:hover svg { color: var(--button-hover-text-color); }
+
+/* Delete button with animated trash icon */
+.delete-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background-color: #2a2a2e;
+  border: none;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  position: relative;
+  gap: 2px;
+}
+.delete-btn:hover {
+  border-radius: 50%;
+  background-color: #3a3a3f;
+  gap: 0;
+}
+.delete-btn .svgIcon {
+  width: 12px;
+  transition-duration: 0.3s;
+}
+.delete-btn .svgIcon path {
+  fill: #9ca3af;
+}
+.delete-btn:hover .svgIcon path {
+  fill: #ef4444;
+}
+.delete-btn .bin-top {
+  transform-origin: bottom right;
+}
+.delete-btn:hover .bin-top {
+  transition-duration: 0.5s;
+  transform: rotate(160deg);
+}
 
 
