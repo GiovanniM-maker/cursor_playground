@@ -8,11 +8,12 @@ export default {
   theme: {
     extend: {
       colors: {
-        surface: '#f7f7f8',
-        panel: '#ffffff',
-        border: '#e7e7ea',
-        text: '#0b0b0c',
-        dim: '#6b7280',
+        surface: '#0b0b0c',
+        panel: '#1a1a1c',
+        'panel-2': '#222224',
+        border: '#2a2a2e',
+        text: '#eaeaea',
+        dim: '#9ca3af',
         accent: '#0a84ff',
       },
       boxShadow: {

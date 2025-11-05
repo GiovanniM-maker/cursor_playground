@@ -1,6 +1,7 @@
 import React from 'react'
 import { useChatStore, flattenChats } from './store'
 import { Message, Attachment } from './types'
+import Loader from './Loader'
 
 function flattenFolders(tree: any[]): { id: string, name: string }[] {
   const out: { id: string, name: string }[] = []
@@ -140,7 +141,7 @@ export default function App() {
     <div className="h-full relative bg-surface">
       {/* Sidebar overlay, non-card */}
       <div className={
-        `fixed inset-y-0 left-0 z-30 w-[280px] transform bg-white border-r border-border shadow-soft transition-transform duration-200 ${
+        `fixed inset-y-0 left-0 z-30 w-[280px] transform bg-panel border-r border-border shadow-soft transition-transform duration-200 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`
       }>
@@ -177,17 +178,17 @@ export default function App() {
                 <div className="ml-2 relative" ref={openMenuId === n.id ? menuRef : undefined}>
                   <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === n.id ? null : n.id)} aria-label="Altro">⋯</button>
                   {openMenuId === n.id && (
-                    <div className="absolute right-0 z-10 mt-1 w-44 rounded-lg border border-border bg-white shadow-soft p-1 text-sm">
-                      <button className="w-full text-left px-3 py-2 hover:bg-surface" onClick={() => { setOpenMenuId(null); promptRenameChat(n.id, n.title) }}>Rinomina</button>
-                      <button className="w-full text-left px-3 py-2 hover:bg-surface" onClick={() => { setOpenMenuId(null); moveChatUp(n.id) }}>Sposta su</button>
-                      <button className="w-full text-left px-3 py-2 hover:bg-surface" onClick={() => { setOpenMenuId(null); moveChatDown(n.id) }}>Sposta giù</button>
+                    <div className="absolute right-0 z-10 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
+                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); promptRenameChat(n.id, n.title) }}>Rinomina</button>
+                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatUp(n.id) }}>Sposta su</button>
+                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatDown(n.id) }}>Sposta giù</button>
                       <div className="px-3 pt-2 pb-1 text-xs text-dim">Muovi in</div>
-                      <button className="w-full text-left px-3 py-2 hover:bg-surface" onClick={() => { setOpenMenuId(null); moveChatToFolder(n.id, null) }}>Radice</button>
+                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatToFolder(n.id, null) }}>Radice</button>
                       {flattenFolders(tree).map(f => (
-                        <button key={f.id} className="w-full text-left px-3 py-2 hover:bg-surface" onClick={() => { setOpenMenuId(null); moveChatToFolder(n.id, f.id) }}>{f.name}</button>
+                        <button key={f.id} className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatToFolder(n.id, f.id) }}>{f.name}</button>
                       ))}
                       <div className="border-t border-border my-1" />
-                      <button className="w-full text-left px-3 py-2 hover:bg-surface text-red-600" onClick={() => { setOpenMenuId(null); deleteChat(n.id) }}>Elimina</button>
+                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2 text-red-400" onClick={() => { setOpenMenuId(null); deleteChat(n.id) }}>Elimina</button>
                     </div>
                   )}
                 </div>
@@ -203,10 +204,10 @@ export default function App() {
                 <div className="ml-2 relative" ref={openMenuId === n.id ? menuRef : undefined}>
                   <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === n.id ? null : n.id)} aria-label="Altro">⋯</button>
                   {openMenuId === n.id && (
-                    <div className="absolute right-0 z-10 mt-1 w-44 rounded-lg border border-border bg-white shadow-soft p-1 text-sm">
-                      <button className="w-full text-left px-3 py-2 hover:bg-surface" onClick={() => { setOpenMenuId(null); promptRenameFolder(n.id, n.name) }}>Rinomina</button>
+                    <div className="absolute right-0 z-10 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
+                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); promptRenameFolder(n.id, n.name) }}>Rinomina</button>
                       <div className="border-t border-border my-1" />
-                      <button className="w-full text-left px-3 py-2 hover:bg-surface text-red-600" onClick={() => { setOpenMenuId(null); deleteFolder(n.id) }}>Elimina</button>
+                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2 text-red-400" onClick={() => { setOpenMenuId(null); deleteFolder(n.id) }}>Elimina</button>
                     </div>
                   )}
                 </div>
@@ -249,53 +250,64 @@ export default function App() {
           </div>
           <div className="text-dim text-sm">Pronta</div>
         </header>
-        <main className="relative overflow-auto p-4 space-y-3">
-          {messages.map(m => (
-            <div key={m.id} className={`flex items-start gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
-              <div className="max-w-prose rounded-lg border border-border bg-white p-3 shadow-sm">
-                <div>{m.content}</div>
-                {m.attachments && m.attachments.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {m.attachments.map(a => (
-                      <span key={a.id} className="px-2 py-1 text-xs rounded-full border border-border bg-surface">{a.name}</span>
-                    ))}
+        <main className="relative overflow-auto p-4">
+          <div className="mx-auto max-w-[70%] space-y-3">
+            {messages.map(m => {
+              const isLastGenerating = m.role === 'assistant' && isGenerating && messages[messages.length-1]?.id === m.id
+              return (
+                <div key={m.id} className={`flex items-start gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
+                  {m.role === 'assistant' && isLastGenerating && (
+                    <Loader />
+                  )}
+                  <div className="max-w-prose rounded-lg border border-border bg-panel p-3 shadow-sm">
+                    {isLastGenerating ? (
+                      <div className="text-dim">Generando...</div>
+                    ) : (
+                      <>
+                        <div>{m.content}</div>
+                        {m.attachments && m.attachments.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {m.attachments.map(a => (
+                              <span key={a.id} className="px-2 py-1 text-xs rounded-full border border-border bg-surface">{a.name}</span>
+                            ))}
+                          </div>
+                        )}
+                        {m.role === 'assistant' && (
+                          <div className="mt-2 flex gap-2 text-xs">
+                            <button className="copy" onClick={(e) => { navigator.clipboard.writeText(m.content); (e.currentTarget.querySelector('.tooltip') as HTMLElement)?.focus(); e.currentTarget.blur(); }}>
+                              <span className="tooltip" data-text-initial="Copy" data-text-end="Copied!"></span>
+                              <span>
+                                <svg className="clipboard" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6.35 6.35" width="20" height="20" aria-hidden>
+                                  <path d="M2.43.265c-.3 0-.548.236-.573.53h-.328a.74.74 0 0 0-.735.734v3.822a.74.74 0 0 0 .735.734H4.82a.74.74 0 0 0 .735-.734V1.529a.74.74 0 0 0-.735-.735h-.328a.58.58 0 0 0-.573-.53zm0 .529h1.49c.032 0 .049.017.049.049v.431c0 .032-.017.049-.049.049H2.43c-.032 0-.05-.017-.05-.049V.843c0-.032.018-.05.05-.05zm-.901.53h.328c.026.292.274.528.573.528h1.49a.58.58 0 0 0 .573-.529h.328a.2.2 0 0 1 .206.206v3.822a.2.2 0 0 1-.206.205H1.53a.2.2 0 0 1-.206-.205V1.529a.2.2 0 0 1 .206-.206z" fill="currentColor"/>
+                                </svg>
+                                <svg className="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+                                  <path d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z" fill="currentColor"/>
+                                </svg>
+                              </span>
+                            </button>
+                            <button className="btn" title="Rigenera" onClick={() => setMessages(prev => prev.filter(x => x.id !== m.id))}>🔁</button>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                )}
-                {m.role === 'assistant' && (
-                  <div className="mt-2 flex gap-2 text-xs">
-                    <button className="copy" onClick={(e) => { navigator.clipboard.writeText(m.content); (e.currentTarget.querySelector('.tooltip') as HTMLElement)?.focus(); e.currentTarget.blur(); }}>
-                      <span className="tooltip" data-text-initial="Copy" data-text-end="Copied!"></span>
-                      <span>
-                        <svg className="clipboard" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6.35 6.35" width="20" height="20" aria-hidden>
-                          <path d="M2.43.265c-.3 0-.548.236-.573.53h-.328a.74.74 0 0 0-.735.734v3.822a.74.74 0 0 0 .735.734H4.82a.74.74 0 0 0 .735-.734V1.529a.74.74 0 0 0-.735-.735h-.328a.58.58 0 0 0-.573-.53zm0 .529h1.49c.032 0 .049.017.049.049v.431c0 .032-.017.049-.049.049H2.43c-.032 0-.05-.017-.05-.049V.843c0-.032.018-.05.05-.05zm-.901.53h.328c.026.292.274.528.573.528h1.49a.58.58 0 0 0 .573-.529h.328a.2.2 0 0 1 .206.206v3.822a.2.2 0 0 1-.206.205H1.53a.2.2 0 0 1-.206-.205V1.529a.2.2 0 0 1 .206-.206z" fill="currentColor"/>
-                        </svg>
-                        <svg className="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-                          <path d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z" fill="currentColor"/>
-                        </svg>
-                      </span>
-                    </button>
-                    <button className="btn" title="Rigenera" onClick={() => setMessages(prev => prev.filter(x => x.id !== m.id))}>🔁</button>
-                  </div>
-                )}
-              </div>
-              {m.role === 'assistant' && isGenerating && messages[messages.length-1]?.id === m.id && (
-                <span className="text-dim text-xs" aria-hidden>⏳</span>
-              )}
-            </div>
-          ))}
+                </div>
+              )
+            })}
+          </div>
 
           {/* Floating Model Settings button/panel on top-right */}
           <div className="fixed right-3 top-3 z-20">
             <div className="relative">
               <button
-                className="btn bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60"
+                className="btn bg-panel/80 backdrop-blur supports-[backdrop-filter]:bg-panel/60"
                 onClick={() => setSettingsOpen(v => !v)}
                 aria-expanded={settingsOpen}
               >
                 ⚙︎ Modello
               </button>
               {settingsOpen && (
-                <div className="absolute right-0 mt-2 w-[320px] rounded-xl border border-border bg-white p-3 shadow-soft">
+                <div className="absolute right-0 mt-2 w-[320px] rounded-xl border border-border bg-panel p-3 shadow-soft">
                   <div className="mb-2">
                     <h2 className="text-sm font-semibold">Impostazioni modello</h2>
                     <p className="text-xs text-dim">Scegli modello e parametri</p>
@@ -333,8 +345,8 @@ export default function App() {
             </div>
           </div>
         </main>
-        <footer className="border-t border-border p-3 bg-white/80 backdrop-blur">
-          <div className="mx-auto max-w-3xl w-full flex flex-col gap-2">
+        <footer className="border-t border-border p-3 bg-panel/80 backdrop-blur">
+          <div className="mx-auto max-w-[70%] w-full flex flex-col gap-2">
             <div className="flex gap-2">
               <input className="input flex-1" placeholder="Scrivi un messaggio..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); isGenerating ? stopGeneration() : sendMessage() } }} />
               <label className="btn cursor-pointer">
