@@ -22,6 +22,7 @@ export type Chat = {
   title: string
   messages: Message[]
   updatedAt: number
+  createdAt: number
 }
 
 export type Folder = {

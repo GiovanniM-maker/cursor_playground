@@ -27,11 +27,13 @@ type Actions = {
 function now() { return Date.now() }
 
 function createInitialData(): RootTree {
-  const c1: Chat = { type: 'chat', id: uid('chat'), title: 'Chat 1', updatedAt: now(), messages: [
+  const now1 = now()
+  const c1: Chat = { type: 'chat', id: uid('chat'), title: 'Chat 1', updatedAt: now1, createdAt: now1, messages: [
     { id: uid('m'), role: 'assistant', content: 'Ciao! Come posso aiutarti oggi?' },
     { id: uid('m'), role: 'user', content: 'Vorrei uno stile Apple per una chat.' },
   ] }
-  const c2: Chat = { type: 'chat', id: uid('chat'), title: 'Chat 2', updatedAt: now(), messages: [] }
+  const now2 = now()
+  const c2: Chat = { type: 'chat', id: uid('chat'), title: 'Chat 2', updatedAt: now2, createdAt: now2, messages: [] }
   const f1: Folder = { type: 'folder', id: uid('folder'), name: 'Lavoro', children: [c2] }
   return [c1, f1]
 }
@@ -73,7 +75,8 @@ export const useChatStore = create<State & Actions>((set, get) => ({
   enterFolder: (folderId) => set({ currentFolderId: folderId }),
 
   addChat: () => set(state => {
-    const chat: Chat = { type: 'chat', id: uid('chat'), title: 'Nuova chat', updatedAt: now(), messages: [] }
+    const nowTime = now()
+    const chat: Chat = { type: 'chat', id: uid('chat'), title: 'Nuova chat', updatedAt: nowTime, createdAt: nowTime, messages: [] }
     const updated = structuredClone(state.tree) as RootTree
     const list = getListByFolder(updated, state.currentFolderId)
     list.unshift(chat)

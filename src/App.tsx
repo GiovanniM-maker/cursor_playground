@@ -20,6 +20,7 @@ function flattenFolders(tree: any[]): { id: string, name: string }[] {
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = React.useState(true)
   const [foldersSidebarOpen, setFoldersSidebarOpen] = React.useState(false)
+  const [selectedFolderId, setSelectedFolderId] = React.useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = React.useState(false)
   const [settingsSections, setSettingsSections] = React.useState({
     model: false,
@@ -176,20 +177,28 @@ export default function App() {
           </div>
         </div>
         <div className="flex-1 overflow-auto px-3 pb-3 min-h-0">
-          {/* Chat section */}
+          {/* Folders section - prima */}
           <div className="mb-4">
+            <button className="w-full flex items-center justify-between px-1 py-2 mb-2 hover:bg-panel-2 rounded" onClick={() => setFoldersSidebarOpen(true)}>
+              <div className="text-xs font-semibold text-dim uppercase tracking-wide">Cartelle</div>
+              <span className="text-dim">→</span>
+            </button>
+          </div>
+
+          {/* Chat section - dopo */}
+          <div>
             <div className="text-xs font-semibold text-dim uppercase tracking-wide mb-2 px-1">Chat</div>
             <div className="divide-y divide-border">
-              {chatsOnly.map((n: any) => (
+              {chatsOnly.sort((a: any, b: any) => b.updatedAt - a.updatedAt).map((n: any) => (
                 <div
                   key={n.id}
-                  className="py-2 flex items-center justify-between group"
+                  className="py-2 flex items-center justify-between group relative"
                   draggable
                   onDragStart={(e) => { setDragChatId(n.id); e.dataTransfer.setData('text/plain', n.id) }}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => { e.preventDefault(); const src = dragChatId || e.dataTransfer.getData('text/plain'); if (src && src !== n.id) moveChatBefore(src, n.id); setDragChatId(null) }}
                 >
-                  <button className="text-sm text-left truncate flex-1" onClick={() => {/* future: open chat */}}>{n.title}</button>
+                  <button className="text-sm text-left truncate flex-1" onClick={() => {/* future: open chat */}} title={new Date(n.createdAt).toLocaleString('it-IT')}>{n.title}</button>
                   <div className="ml-2 relative" ref={openMenuId === n.id ? menuRef : undefined}>
                     <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === n.id ? null : n.id)} aria-label="Altro">⋯</button>
                     {openMenuId === n.id && (
@@ -207,17 +216,13 @@ export default function App() {
                       </div>
                     )}
                   </div>
+                  {/* Tooltip data creazione */}
+                  <div className="absolute left-0 bottom-full mb-2 px-2 py-1 bg-panel-2 border border-border rounded text-xs text-dim opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10">
+                    {new Date(n.createdAt).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Folders section */}
-          <div>
-            <button className="w-full flex items-center justify-between px-1 py-2 mb-2 hover:bg-panel-2 rounded" onClick={() => setFoldersSidebarOpen(true)}>
-              <div className="text-xs font-semibold text-dim uppercase tracking-wide">Cartelle</div>
-              <span className="text-dim">→</span>
-            </button>
           </div>
         </div>
       </div>
@@ -226,31 +231,79 @@ export default function App() {
       {foldersSidebarOpen && (
         <div className="fixed inset-y-0 left-[280px] z-30 w-[280px] transform bg-panel border-r border-border shadow-soft transition-transform duration-200 flex flex-col">
           <div className="flex items-center justify-between px-3 py-3 border-b border-border flex-shrink-0">
-            <span className="text-sm font-medium">Cartelle</span>
-            <button className="btn px-2 py-1" aria-label="Chiudi" onClick={() => setFoldersSidebarOpen(false)}>✕</button>
+            <span className="text-sm font-medium">{selectedFolderId ? 'Chat nella cartella' : 'Cartelle'}</span>
+            <button className="btn px-2 py-1" aria-label="Chiudi" onClick={() => { setFoldersSidebarOpen(false); setSelectedFolderId(null) }}>✕</button>
           </div>
-          <div className="flex-1 overflow-auto px-3 pb-3 divide-y divide-border min-h-0">
-            {tree.filter((n: any) => n.type === 'folder').map((f: any) => (
-              <div
-                key={f.id}
-                className="py-2 flex items-center justify-between group"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => { e.preventDefault(); const src = dragChatId || e.dataTransfer.getData('text/plain'); if (src) moveChatToFolder(src, f.id); setDragChatId(null) }}
-              >
-                <button className="text-sm font-medium text-left truncate flex-1" onClick={() => enterFolder(f.id)}>{f.name}</button>
-                <div className="ml-2 relative" ref={openMenuId === f.id ? menuRef : undefined}>
-                  <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === f.id ? null : f.id)} aria-label="Altro">⋯</button>
-                  {openMenuId === f.id && (
-                    <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
-                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); promptRenameFolder(f.id, f.name) }}>Rinomina</button>
-                      <div className="border-t border-border my-1" />
-                      <button className="w-full text-left px-3 py-2 hover:bg-panel-2 text-red-400" onClick={() => { setOpenMenuId(null); deleteFolder(f.id) }}>Elimina</button>
-                    </div>
-                  )}
+          {selectedFolderId ? (
+            <div className="flex-1 overflow-auto px-3 pb-3 min-h-0">
+              {(() => {
+                const folder = tree.find((n: any) => n.type === 'folder' && n.id === selectedFolderId) as any
+                const folderChats = folder?.children?.filter((c: any) => c.type === 'chat') || []
+                return folderChats.length > 0 ? (
+                  <div className="divide-y divide-border">
+                    {folderChats.sort((a: any, b: any) => b.updatedAt - a.updatedAt).map((chat: any) => (
+                      <div
+                        key={chat.id}
+                        className="py-2 flex items-center justify-between group relative"
+                        draggable
+                        onDragStart={(e) => { setDragChatId(chat.id); e.dataTransfer.setData('text/plain', chat.id) }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => { e.preventDefault(); const src = dragChatId || e.dataTransfer.getData('text/plain'); if (src && src !== chat.id) moveChatBefore(src, chat.id); setDragChatId(null) }}
+                      >
+                        <button className="text-sm text-left truncate flex-1" onClick={() => {/* future: open chat */}} title={new Date(chat.createdAt).toLocaleString('it-IT')}>{chat.title}</button>
+                        <div className="ml-2 relative" ref={openMenuId === chat.id ? menuRef : undefined}>
+                          <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === chat.id ? null : chat.id)} aria-label="Altro">⋯</button>
+                          {openMenuId === chat.id && (
+                            <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
+                              <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); promptRenameChat(chat.id, chat.title) }}>Rinomina</button>
+                              <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatUp(chat.id) }}>Sposta su</button>
+                              <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatDown(chat.id) }}>Sposta giù</button>
+                              <div className="px-3 pt-2 pb-1 text-xs text-dim">Muovi in</div>
+                              <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatToFolder(chat.id, null) }}>Radice</button>
+                              {flattenFolders(tree).filter((f: any) => f.id !== selectedFolderId).map((f: any) => (
+                                <button key={f.id} className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatToFolder(chat.id, f.id) }}>{f.name}</button>
+                              ))}
+                              <div className="border-t border-border my-1" />
+                              <button className="w-full text-left px-3 py-2 hover:bg-panel-2 text-red-400" onClick={() => { setOpenMenuId(null); deleteChat(chat.id) }}>Elimina</button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="absolute left-0 bottom-full mb-2 px-2 py-1 bg-panel-2 border border-border rounded text-xs text-dim opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10">
+                          {new Date(chat.createdAt).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-dim py-4 text-center">Nessuna chat in questa cartella</div>
+                )
+              })()}
+              <button className="mt-4 w-full btn text-sm" onClick={() => setSelectedFolderId(null)}>← Indietro</button>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-auto px-3 pb-3 divide-y divide-border min-h-0">
+              {tree.filter((n: any) => n.type === 'folder').map((f: any) => (
+                <div
+                  key={f.id}
+                  className="py-2 flex items-center justify-between group"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); const src = dragChatId || e.dataTransfer.getData('text/plain'); if (src) moveChatToFolder(src, f.id); setDragChatId(null) }}
+                >
+                  <button className="text-sm font-medium text-left truncate flex-1" onClick={() => setSelectedFolderId(f.id)}>{f.name}</button>
+                  <div className="ml-2 relative" ref={openMenuId === f.id ? menuRef : undefined}>
+                    <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === f.id ? null : f.id)} aria-label="Altro">⋯</button>
+                    {openMenuId === f.id && (
+                      <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
+                        <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); promptRenameFolder(f.id, f.name) }}>Rinomina</button>
+                        <div className="border-t border-border my-1" />
+                        <button className="w-full text-left px-3 py-2 hover:bg-panel-2 text-red-400" onClick={() => { setOpenMenuId(null); deleteFolder(f.id) }}>Elimina</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
