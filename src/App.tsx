@@ -1,5 +1,6 @@
 import React from 'react'
 import { useChatStore, flattenChats } from './store'
+import { Message, Attachment } from './types'
 
 function flattenFolders(tree: any[]): { id: string, name: string }[] {
   const out: { id: string, name: string }[] = []
@@ -20,6 +21,62 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = React.useState(false)
 
   const { tree, currentFolderId, search, setSearch, enterFolder, addChat, addFolder, renameChat, renameFolder, deleteChat, deleteFolder, moveChatUp, moveChatDown, moveChatToFolder } = useChatStore()
+
+  // Chat state (per demo - later bind to selected chat from store)
+  const [messages, setMessages] = React.useState<Message[]>([
+    { id: 'm1', role: 'assistant', content: 'Ciao! Come posso aiutarti oggi?' }
+  ])
+  const [input, setInput] = React.useState('')
+  const [attachments, setAttachments] = React.useState<Attachment[]>([])
+  const [isGenerating, setIsGenerating] = React.useState(false)
+  const generationAbortRef = React.useRef<AbortController | null>(null)
+
+  function onAttachFiles(files: FileList | null) {
+    if (!files) return
+    const next: Attachment[] = []
+    for (const f of Array.from(files)) {
+      next.push({ id: `${f.name}-${f.size}-${crypto.randomUUID?.() ?? Math.random()}`, name: f.name, type: f.type || 'application/octet-stream', size: f.size })
+    }
+    setAttachments(prev => [...prev, ...next])
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments(prev => prev.filter(a => a.id !== id))
+  }
+
+  async function sendMessage() {
+    const text = input.trim()
+    if (!text && attachments.length === 0) return
+    const userMsg: Message = { id: `u_${Date.now()}`,'role':'user','content': text,'attachments': attachments }
+    setMessages(prev => [...prev, userMsg])
+    setInput('')
+    setAttachments([])
+
+    // Start generation
+    setIsGenerating(true)
+    generationAbortRef.current = new AbortController()
+    const controller = generationAbortRef.current
+
+    // Simulated AI response streaming
+    const chunks = ['Sto elaborando la tua richiesta', ' e preparo un design', ' in stile Apple minimal.', ' Fatto!']
+    let acc = ''
+    const assistantId = `a_${Date.now()}`
+    setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '…' }])
+
+    for (const piece of chunks) {
+      if (controller.signal.aborted) break
+      await new Promise(r => setTimeout(r, 600))
+      acc += piece
+      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: acc } : m))
+    }
+    setIsGenerating(false)
+    generationAbortRef.current = null
+  }
+
+  function stopGeneration() {
+    generationAbortRef.current?.abort()
+    setIsGenerating(false)
+  }
 
   const currentList = React.useMemo(() => {
     // compute the list to render for current folder
@@ -160,18 +217,34 @@ export default function App() {
           <div className="text-dim text-sm">Pronta</div>
         </header>
         <main className="relative overflow-auto p-4 space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="h-8 w-8 rounded-lg bg-surface border border-border grid place-items-center">🙂</div>
-            <div className="max-w-prose rounded-lg border border-border bg-white p-3 shadow-sm">
-              Ciao! Come posso aiutarti oggi?
+          {messages.map(m => (
+            <div key={m.id} className={`flex items-start gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
+              {m.role === 'assistant' && (
+                <div className="h-8 w-8 rounded-lg bg-surface border border-border grid place-items-center" aria-hidden>
+                  {isGenerating && messages[messages.length-1]?.id === m.id ? '⏳' : '🤖'}
+                </div>
+              )}
+              <div className="max-w-prose rounded-lg border border-border bg-white p-3 shadow-sm">
+                <div>{m.content}</div>
+                {m.attachments && m.attachments.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {m.attachments.map(a => (
+                      <span key={a.id} className="px-2 py-1 text-xs rounded-full border border-border bg-surface">{a.name}</span>
+                    ))}
+                  </div>
+                )}
+                {m.role === 'assistant' && (
+                  <div className="mt-2 flex gap-2 text-xs">
+                    <button className="btn" onClick={() => navigator.clipboard.writeText(m.content)}>Copia</button>
+                    <button className="btn" onClick={() => setMessages(prev => prev.filter(x => x.id !== m.id))}>Rigenera</button>
+                  </div>
+                )}
+              </div>
+              {m.role === 'user' && (
+                <div className="h-8 w-8 rounded-lg bg-surface border border-border grid place-items-center" aria-hidden>🧑‍💻</div>
+              )}
             </div>
-          </div>
-          <div className="flex items-start gap-3 justify-end">
-            <div className="max-w-prose rounded-lg border border-border bg-white p-3 shadow-sm">
-              Vorrei un’interfaccia in stile Apple per una chat.
-            </div>
-            <div className="h-8 w-8 rounded-lg bg-surface border border-border grid place-items-center">🧑‍💻</div>
-          </div>
+          ))}
 
           {/* Floating Model Settings button/panel on top-right */}
           <div className="fixed right-3 top-3 z-20">
@@ -223,9 +296,29 @@ export default function App() {
           </div>
         </main>
         <footer className="border-t border-border p-3 bg-white/80 backdrop-blur">
-          <div className="mx-auto max-w-3xl flex gap-2">
-            <input className="input" placeholder="Scrivi un messaggio..." />
-            <button className="btn">Invia</button>
+          <div className="mx-auto max-w-3xl w-full flex flex-col gap-2">
+            <div className="flex gap-2">
+              <input className="input flex-1" placeholder="Scrivi un messaggio..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); isGenerating ? stopGeneration() : sendMessage() } }} />
+              <label className="btn cursor-pointer">
+                📎
+                <input type="file" multiple className="hidden" onChange={e => onAttachFiles(e.target.files)} />
+              </label>
+              {isGenerating ? (
+                <button className="btn" title="Ferma" onClick={stopGeneration}>■</button>
+              ) : (
+                <button className="btn" title="Invia" onClick={sendMessage}>Invia</button>
+              )}
+            </div>
+            {attachments.length > 0 && (
+              <div className="attachments flex flex-wrap gap-2">
+                {attachments.map(a => (
+                  <span key={a.id} className="px-2 py-1 text-xs rounded-full border border-border bg-surface inline-flex items-center gap-2">
+                    {a.name}
+                    <button className="btn" onClick={() => removeAttachment(a.id)} aria-label="Rimuovi">✕</button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </footer>
       </div>
