@@ -20,7 +20,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = React.useState(true)
   const [settingsOpen, setSettingsOpen] = React.useState(false)
 
-  const { tree, currentFolderId, search, setSearch, enterFolder, addChat, addFolder, renameChat, renameFolder, deleteChat, deleteFolder, moveChatUp, moveChatDown, moveChatToFolder } = useChatStore()
+  const { tree, currentFolderId, search, setSearch, enterFolder, addChat, addFolder, renameChat, renameFolder, deleteChat, deleteFolder, moveChatUp, moveChatDown, moveChatToFolder, moveChatBefore } = useChatStore()
 
   // Chat state (per demo - later bind to selected chat from store)
   const [messages, setMessages] = React.useState<Message[]>([
@@ -121,6 +121,21 @@ export default function App() {
     if (name && name.trim()) renameFolder(id, name.trim())
   }
 
+  const [openMenuId, setOpenMenuId] = React.useState<string | null>(null)
+  const menuRef = React.useRef<HTMLDivElement | null>(null)
+  React.useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!menuRef.current) return
+      if (!(e.target instanceof Node)) return
+      if (!menuRef.current.contains(e.target)) setOpenMenuId(null)
+    }
+    document.addEventListener('click', onDocClick)
+    return () => document.removeEventListener('click', onDocClick)
+  }, [])
+
+  // drag and drop
+  const [dragChatId, setDragChatId] = React.useState<string | null>(null)
+
   return (
     <div className="h-full relative bg-surface">
       {/* Sidebar overlay, non-card */}
@@ -142,40 +157,58 @@ export default function App() {
             <input className="input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca chat e contenuti..." />
           </div>
         </div>
-        <div className="overflow-auto px-3 pb-3 space-y-2">
+        <div className="overflow-auto px-3 pb-3 divide-y divide-border">
           {currentFolderId && (
-            <div className="text-xs text-dim px-1">
+            <div className="text-xs text-dim px-1 py-2">
               <button className="btn" onClick={() => enterFolder(null)}>← Indietro</button>
             </div>
           )}
-          {(currentList as any[]).map((n: any) => (
+          {(currentList as any[]).map((n: any, index: number) => (
             n.type === 'chat' ? (
-              <div key={n.id} className="border border-border rounded-lg p-2 flex items-center justify-between">
-                <button className="text-sm" onClick={() => {/* future: open chat */}}>{n.title}</button>
-                <div className="flex items-center gap-1">
-                  <button className="btn" onClick={() => promptRenameChat(n.id, n.title)} aria-label="Rinomina">✏️</button>
-                  <button className="btn" onClick={() => moveChatUp(n.id)} aria-label="Sposta su">▲</button>
-                  <button className="btn" onClick={() => moveChatDown(n.id)} aria-label="Sposta giù">▼</button>
-                  <div className="relative">
-                    <select className="input" onChange={e => { const v = e.target.value || null; moveChatToFolder(n.id, v === 'root' ? null : v as string) }} defaultValue="">
-                      <option value="" disabled>Muovi in…</option>
-                      <option value="root">Radice</option>
+              <div
+                key={n.id}
+                className="py-2 flex items-center justify-between group"
+                draggable
+                onDragStart={(e) => { setDragChatId(n.id); e.dataTransfer.setData('text/plain', n.id) }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); const src = dragChatId || e.dataTransfer.getData('text/plain'); if (src && src !== n.id) moveChatBefore(src, n.id); setDragChatId(null) }}
+              >
+                <button className="text-sm text-left truncate flex-1" onClick={() => {/* future: open chat */}}>{n.title}</button>
+                <div className="ml-2 relative" ref={openMenuId === n.id ? menuRef : undefined}>
+                  <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === n.id ? null : n.id)} aria-label="Altro">⋯</button>
+                  {openMenuId === n.id && (
+                    <div className="absolute right-0 z-10 mt-1 w-44 rounded-lg border border-border bg-white shadow-soft p-1 text-sm">
+                      <button className="w-full text-left px-3 py-2 hover:bg-surface" onClick={() => { setOpenMenuId(null); promptRenameChat(n.id, n.title) }}>Rinomina</button>
+                      <button className="w-full text-left px-3 py-2 hover:bg-surface" onClick={() => { setOpenMenuId(null); moveChatUp(n.id) }}>Sposta su</button>
+                      <button className="w-full text-left px-3 py-2 hover:bg-surface" onClick={() => { setOpenMenuId(null); moveChatDown(n.id) }}>Sposta giù</button>
+                      <div className="px-3 pt-2 pb-1 text-xs text-dim">Muovi in</div>
+                      <button className="w-full text-left px-3 py-2 hover:bg-surface" onClick={() => { setOpenMenuId(null); moveChatToFolder(n.id, null) }}>Radice</button>
                       {flattenFolders(tree).map(f => (
-                        <option key={f.id} value={f.id}>{f.name}</option>
+                        <button key={f.id} className="w-full text-left px-3 py-2 hover:bg-surface" onClick={() => { setOpenMenuId(null); moveChatToFolder(n.id, f.id) }}>{f.name}</button>
                       ))}
-                    </select>
-                  </div>
-                  <button className="btn" onClick={() => deleteChat(n.id)} aria-label="Elimina">🗑️</button>
+                      <div className="border-t border-border my-1" />
+                      <button className="w-full text-left px-3 py-2 hover:bg-surface text-red-600" onClick={() => { setOpenMenuId(null); deleteChat(n.id) }}>Elimina</button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
-              <div key={n.id} className="border border-border rounded-lg p-2">
-                <div className="flex items-center justify-between">
-                  <button className="text-sm font-medium" onClick={() => enterFolder(n.id)}>📁 {n.name}</button>
-                  <div className="flex items-center gap-1">
-                    <button className="btn" onClick={() => promptRenameFolder(n.id, n.name)} aria-label="Rinomina">✏️</button>
-                    <button className="btn" onClick={() => deleteFolder(n.id)} aria-label="Elimina">🗑️</button>
-                  </div>
+              <div
+                key={n.id}
+                className="py-2 flex items-center justify-between"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); const src = dragChatId || e.dataTransfer.getData('text/plain'); if (src) moveChatToFolder(src, n.id); setDragChatId(null) }}
+              >
+                <button className="text-sm font-medium text-left truncate flex-1" onClick={() => enterFolder(n.id)}>{n.name}</button>
+                <div className="ml-2 relative" ref={openMenuId === n.id ? menuRef : undefined}>
+                  <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === n.id ? null : n.id)} aria-label="Altro">⋯</button>
+                  {openMenuId === n.id && (
+                    <div className="absolute right-0 z-10 mt-1 w-44 rounded-lg border border-border bg-white shadow-soft p-1 text-sm">
+                      <button className="w-full text-left px-3 py-2 hover:bg-surface" onClick={() => { setOpenMenuId(null); promptRenameFolder(n.id, n.name) }}>Rinomina</button>
+                      <div className="border-t border-border my-1" />
+                      <button className="w-full text-left px-3 py-2 hover:bg-surface text-red-600" onClick={() => { setOpenMenuId(null); deleteFolder(n.id) }}>Elimina</button>
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -219,11 +252,6 @@ export default function App() {
         <main className="relative overflow-auto p-4 space-y-3">
           {messages.map(m => (
             <div key={m.id} className={`flex items-start gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
-              {m.role === 'assistant' && (
-                <div className="h-8 w-8 rounded-lg bg-surface border border-border grid place-items-center" aria-hidden>
-                  {isGenerating && messages[messages.length-1]?.id === m.id ? '⏳' : '🤖'}
-                </div>
-              )}
               <div className="max-w-prose rounded-lg border border-border bg-white p-3 shadow-sm">
                 <div>{m.content}</div>
                 {m.attachments && m.attachments.length > 0 && (
@@ -235,13 +263,13 @@ export default function App() {
                 )}
                 {m.role === 'assistant' && (
                   <div className="mt-2 flex gap-2 text-xs">
-                    <button className="btn" onClick={() => navigator.clipboard.writeText(m.content)}>Copia</button>
-                    <button className="btn" onClick={() => setMessages(prev => prev.filter(x => x.id !== m.id))}>Rigenera</button>
+                    <button className="btn" title="Copia" onClick={() => navigator.clipboard.writeText(m.content)}>📋</button>
+                    <button className="btn" title="Rigenera" onClick={() => setMessages(prev => prev.filter(x => x.id !== m.id))}>🔁</button>
                   </div>
                 )}
               </div>
-              {m.role === 'user' && (
-                <div className="h-8 w-8 rounded-lg bg-surface border border-border grid place-items-center" aria-hidden>🧑‍💻</div>
+              {m.role === 'assistant' && isGenerating && messages[messages.length-1]?.id === m.id && (
+                <span className="text-dim text-xs" aria-hidden>⏳</span>
               )}
             </div>
           ))}

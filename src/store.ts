@@ -21,6 +21,7 @@ type Actions = {
   moveChatUp: (chatId: string) => void
   moveChatDown: (chatId: string) => void
   moveChatToFolder: (chatId: string, targetFolderId: string | null) => void
+  moveChatBefore: (chatId: string, beforeChatId: string) => void
 }
 
 function now() { return Date.now() }
@@ -167,6 +168,20 @@ export const useChatStore = create<State & Actions>((set, get) => ({
       const target = (locTarget.parent ? locTarget.parent.children : updated)[locTarget.index]
       if (target.type === 'folder') target.children.unshift(item)
     }
+    return { tree: updated }
+  }),
+
+  moveChatBefore: (chatId, beforeChatId) => set(state => {
+    const updated = structuredClone(state.tree) as RootTree
+    const locFrom = findParentAndIndex(updated, chatId)
+    const locTo = findParentAndIndex(updated, beforeChatId)
+    if (!locFrom || !locTo) return {}
+    const fromList = locFrom.parent ? locFrom.parent.children : updated
+    const toList = locTo.parent ? locTo.parent.children : updated
+    const [item] = fromList.splice(locFrom.index, 1)
+    if (item.type !== 'chat') return {}
+    const insertIndex = toList.findIndex(n => n.id === beforeChatId)
+    toList.splice(insertIndex, 0, item)
     return { tree: updated }
   }),
 }))
