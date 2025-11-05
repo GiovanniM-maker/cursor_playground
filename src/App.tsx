@@ -141,24 +141,30 @@ export default function App() {
     <div className="h-full relative bg-surface">
       {/* Sidebar overlay, non-card */}
       <div className={
-        `fixed inset-y-0 left-0 z-30 w-[280px] transform bg-panel border-r border-border shadow-soft transition-transform duration-200 ${
+        `fixed inset-y-0 left-0 z-30 w-[280px] transform bg-panel border-r border-border shadow-soft transition-transform duration-200 flex flex-col ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`
       }>
-        <div className="flex items-center justify-between px-3 py-3 border-b border-border">
+        <div className="flex items-center justify-between px-3 py-3 border-b border-border flex-shrink-0">
           <span className="text-sm font-medium">Chat</span>
           <button className="btn px-2 py-1" aria-label="Chiudi sidebar" onClick={() => setSidebarOpen(false)}>✕</button>
         </div>
-        <div className="p-3 space-y-2">
+        <div className="p-3 space-y-2 border-b border-border flex-shrink-0">
           <div className="flex gap-2">
-            <button className="btn w-full" onClick={() => addChat()}>Nuova chat</button>
-            <button className="btn" onClick={() => addFolder()} aria-label="Nuova cartella">📁+</button>
+            <button className="btn w-full flex items-center justify-center gap-2" onClick={() => addChat()}>
+              <span>➕</span>
+              <span>Nuova chat</span>
+            </button>
+            <button className="action-btn-minimal" onClick={() => addFolder()} aria-label="Nuova cartella" title="Nuova cartella">
+              📁
+            </button>
           </div>
-          <div className="mt-2">
-            <input className="input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca chat e contenuti..." />
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-dim">🔍</span>
+            <input className="input pl-9" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca chat e contenuti..." />
           </div>
         </div>
-        <div className="overflow-auto px-3 pb-3 divide-y divide-border">
+        <div className="flex-1 overflow-auto px-3 pb-3 divide-y divide-border min-h-0">
           {currentFolderId && (
             <div className="text-xs text-dim px-1 py-2">
               <button className="btn" onClick={() => enterFolder(null)}>← Indietro</button>
@@ -178,7 +184,7 @@ export default function App() {
                 <div className="ml-2 relative" ref={openMenuId === n.id ? menuRef : undefined}>
                   <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === n.id ? null : n.id)} aria-label="Altro">⋯</button>
                   {openMenuId === n.id && (
-                    <div className="absolute right-0 z-10 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
+                    <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
                       <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); promptRenameChat(n.id, n.title) }}>Rinomina</button>
                       <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatUp(n.id) }}>Sposta su</button>
                       <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); moveChatDown(n.id) }}>Sposta giù</button>
@@ -204,7 +210,7 @@ export default function App() {
                 <div className="ml-2 relative" ref={openMenuId === n.id ? menuRef : undefined}>
                   <button className="opacity-0 group-hover:opacity-100 transition text-lg px-2" onClick={() => setOpenMenuId(openMenuId === n.id ? null : n.id)} aria-label="Altro">⋯</button>
                   {openMenuId === n.id && (
-                    <div className="absolute right-0 z-10 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
+                    <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-border bg-panel shadow-soft p-1 text-sm">
                       <button className="w-full text-left px-3 py-2 hover:bg-panel-2" onClick={() => { setOpenMenuId(null); promptRenameFolder(n.id, n.name) }}>Rinomina</button>
                       <div className="border-t border-border my-1" />
                       <button className="w-full text-left px-3 py-2 hover:bg-panel-2 text-red-400" onClick={() => { setOpenMenuId(null); deleteFolder(n.id) }}>Elimina</button>
@@ -256,59 +262,69 @@ export default function App() {
               const isLastGenerating = m.role === 'assistant' && isGenerating && messages[messages.length-1]?.id === m.id
               return (
                 <div key={m.id} className={`flex items-start gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
-                  {m.role === 'assistant' && isLastGenerating && (
+                  {m.role === 'assistant' && isLastGenerating ? (
                     <Loader />
+                  ) : (
+                    <>
+                      {m.role === 'user' ? (
+                        <div className="max-w-prose rounded-lg bg-accent text-white p-3 shadow-sm">
+                          <div>{m.content}</div>
+                          {m.attachments && m.attachments.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {m.attachments.map(a => (
+                                <span key={a.id} className="px-2 py-1 text-xs rounded-full bg-white/20 text-white">{a.name}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <div className="max-w-prose text-text">
+                            <div>{m.content}</div>
+                            {m.attachments && m.attachments.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {m.attachments.map(a => (
+                                  <span key={a.id} className="px-2 py-1 text-xs rounded-full border border-border bg-surface">{a.name}</span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="mt-2 flex gap-2">
+                              <button className="copy" onClick={() => navigator.clipboard.writeText(m.content)} title="Copia">
+                                <svg className="clipboard" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6.35 6.35" aria-hidden>
+                                  <path d="M2.43.265c-.3 0-.548.236-.573.53h-.328a.74.74 0 0 0-.735.734v3.822a.74.74 0 0 0 .735.734H4.82a.74.74 0 0 0 .735-.734V1.529a.74.74 0 0 0-.735-.735h-.328a.58.58 0 0 0-.573-.53zm0 .529h1.49c.032 0 .049.017.049.049v.431c0 .032-.017.049-.049.049H2.43c-.032 0-.05-.017-.05-.049V.843c0-.032.018-.05.05-.05zm-.901.53h.328c.026.292.274.528.573.528h1.49a.58.58 0 0 0 .573-.529h.328a.2.2 0 0 1 .206.206v3.822a.2.2 0 0 1-.206.205H1.53a.2.2 0 0 1-.206-.205V1.529a.2.2 0 0 1 .206-.206z" fill="currentColor"/>
+                                </svg>
+                                <svg className="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
+                                  <path d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z" fill="currentColor"/>
+                                </svg>
+                              </button>
+                              <button className="delete-btn" onClick={() => setMessages(prev => prev.filter(x => x.id !== m.id))} title="Elimina">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 69 14" className="svgIcon bin-top">
+                                  <g clipPath="url(#clip0_35_24)">
+                                    <path fill="currentColor" d="M20.8232 2.62734L19.9948 4.21304C19.8224 4.54309 19.4808 4.75 19.1085 4.75H4.92857C2.20246 4.75 0 6.87266 0 9.5C0 12.1273 2.20246 14.25 4.92857 14.25H64.0714C66.7975 14.25 69 12.1273 69 9.5C69 6.87266 66.7975 4.75 64.0714 4.75H49.8915C49.5192 4.75 49.1776 4.54309 49.0052 4.21305L48.1768 2.62734C47.3451 1.00938 45.6355 0 43.7719 0H25.2281C23.3645 0 21.6549 1.00938 20.8232 2.62734ZM64.0023 20.0648C64.0397 19.4882 63.5822 19 63.0044 19H5.99556C5.4178 19 4.96025 19.4882 4.99766 20.0648L8.19375 69.3203C8.44018 73.0758 11.6746 76 15.5712 76H53.4288C57.3254 76 60.5598 73.0758 60.8062 69.3203L64.0023 20.0648Z"/>
+                                  </g>
+                                  <defs>
+                                    <clipPath id="clip0_35_24">
+                                      <rect fill="white" height="14" width="69"></rect>
+                                    </clipPath>
+                                  </defs>
+                                </svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 69 57" className="svgIcon bin-bottom">
+                                  <g clipPath="url(#clip0_35_22)">
+                                    <path fill="currentColor" d="M20.8232 -16.3727L19.9948 -14.787C19.8224 -14.4569 19.4808 -14.25 19.1085 -14.25H4.92857C2.20246 -14.25 0 -12.1273 0 -9.5C0 -6.8727 2.20246 -4.75 4.92857 -4.75H64.0714C66.7975 -4.75 69 -6.8727 69 -9.5C69 -12.1273 66.7975 -14.25 64.0714 -14.25H49.8915C49.5192 -14.25 49.1776 -14.4569 49.0052 -14.787L48.1768 -16.3727C47.3451 -17.9906 45.6355 -19 43.7719 -19H25.2281C23.3645 -19 21.6549 -17.9906 20.8232 -16.3727ZM64.0023 1.0648C64.0397 0.4882 63.5822 0 63.0044 0H5.99556C5.4178 0 4.96025 0.4882 4.99766 1.0648L8.19375 50.3203C8.44018 54.0758 11.6746 57 15.5712 57H53.4288C57.3254 57 60.5598 54.0758 60.8062 50.3203L64.0023 1.0648Z"/>
+                                  </g>
+                                  <defs>
+                                    <clipPath id="clip0_35_22">
+                                      <rect fill="white" height="57" width="69"></rect>
+                                    </clipPath>
+                                  </defs>
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </>
                   )}
-                  <div className="max-w-prose rounded-lg border border-border bg-panel p-3 shadow-sm">
-                    {isLastGenerating ? (
-                      <div className="text-dim">Generando...</div>
-                    ) : (
-                      <>
-                        <div>{m.content}</div>
-                        {m.attachments && m.attachments.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {m.attachments.map(a => (
-                              <span key={a.id} className="px-2 py-1 text-xs rounded-full border border-border bg-surface">{a.name}</span>
-                            ))}
-                          </div>
-                        )}
-                        {m.role === 'assistant' && (
-                          <div className="mt-2 flex gap-2">
-                            <button className="copy" onClick={() => navigator.clipboard.writeText(m.content)} title="Copia">
-                              <svg className="clipboard" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6.35 6.35" aria-hidden>
-                                <path d="M2.43.265c-.3 0-.548.236-.573.53h-.328a.74.74 0 0 0-.735.734v3.822a.74.74 0 0 0 .735.734H4.82a.74.74 0 0 0 .735-.734V1.529a.74.74 0 0 0-.735-.735h-.328a.58.58 0 0 0-.573-.53zm0 .529h1.49c.032 0 .049.017.049.049v.431c0 .032-.017.049-.049.049H2.43c-.032 0-.05-.017-.05-.049V.843c0-.032.018-.05.05-.05zm-.901.53h.328c.026.292.274.528.573.528h1.49a.58.58 0 0 0 .573-.529h.328a.2.2 0 0 1 .206.206v3.822a.2.2 0 0 1-.206.205H1.53a.2.2 0 0 1-.206-.205V1.529a.2.2 0 0 1 .206-.206z" fill="currentColor"/>
-                              </svg>
-                              <svg className="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden>
-                                <path d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z" fill="currentColor"/>
-                              </svg>
-                            </button>
-                            <button className="delete-btn" onClick={() => setMessages(prev => prev.filter(x => x.id !== m.id))} title="Elimina">
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 69 14" className="svgIcon bin-top">
-                                <g clipPath="url(#clip0_35_24)">
-                                  <path fill="currentColor" d="M20.8232 2.62734L19.9948 4.21304C19.8224 4.54309 19.4808 4.75 19.1085 4.75H4.92857C2.20246 4.75 0 6.87266 0 9.5C0 12.1273 2.20246 14.25 4.92857 14.25H64.0714C66.7975 14.25 69 12.1273 69 9.5C69 6.87266 66.7975 4.75 64.0714 4.75H49.8915C49.5192 4.75 49.1776 4.54309 49.0052 4.21305L48.1768 2.62734C47.3451 1.00938 45.6355 0 43.7719 0H25.2281C23.3645 0 21.6549 1.00938 20.8232 2.62734ZM64.0023 20.0648C64.0397 19.4882 63.5822 19 63.0044 19H5.99556C5.4178 19 4.96025 19.4882 4.99766 20.0648L8.19375 69.3203C8.44018 73.0758 11.6746 76 15.5712 76H53.4288C57.3254 76 60.5598 73.0758 60.8062 69.3203L64.0023 20.0648Z"/>
-                                </g>
-                                <defs>
-                                  <clipPath id="clip0_35_24">
-                                    <rect fill="white" height="14" width="69"></rect>
-                                  </clipPath>
-                                </defs>
-                              </svg>
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 69 57" className="svgIcon bin-bottom">
-                                <g clipPath="url(#clip0_35_22)">
-                                  <path fill="currentColor" d="M20.8232 -16.3727L19.9948 -14.787C19.8224 -14.4569 19.4808 -14.25 19.1085 -14.25H4.92857C2.20246 -14.25 0 -12.1273 0 -9.5C0 -6.8727 2.20246 -4.75 4.92857 -4.75H64.0714C66.7975 -4.75 69 -6.8727 69 -9.5C69 -12.1273 66.7975 -14.25 64.0714 -14.25H49.8915C49.5192 -14.25 49.1776 -14.4569 49.0052 -14.787L48.1768 -16.3727C47.3451 -17.9906 45.6355 -19 43.7719 -19H25.2281C23.3645 -19 21.6549 -17.9906 20.8232 -16.3727ZM64.0023 1.0648C64.0397 0.4882 63.5822 0 63.0044 0H5.99556C5.4178 0 4.96025 0.4882 4.99766 1.0648L8.19375 50.3203C8.44018 54.0758 11.6746 57 15.5712 57H53.4288C57.3254 57 60.5598 54.0758 60.8062 50.3203L64.0023 1.0648Z"/>
-                                </g>
-                                <defs>
-                                  <clipPath id="clip0_35_22">
-                                    <rect fill="white" height="57" width="69"></rect>
-                                  </clipPath>
-                                </defs>
-                              </svg>
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
                 </div>
               )
             })}
@@ -363,7 +379,7 @@ export default function App() {
             </div>
           </div>
         </main>
-        <footer className="border-t border-border p-3 bg-panel/80 backdrop-blur">
+        <footer className="p-3">
           <div className="mx-auto max-w-[70%] w-full flex flex-col gap-2">
             <div className="flex gap-2">
               <input className="input flex-1" placeholder="Scrivi un messaggio..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); isGenerating ? stopGeneration() : sendMessage() } }} />
