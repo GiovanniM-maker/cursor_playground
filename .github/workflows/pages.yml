@@ -27,8 +27,17 @@ jobs:
       - run: npm ci || npm install
       - name: Check TypeScript
         run: npx tsc --noEmit 2>&1 | head -50 || true
-      - name: Build with verbose output
-        run: npm run build 2>&1 | tail -100
+      - name: Build
+        run: npm run build
+      - name: Verify dist directory
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "ERROR: dist directory was not created!"
+            ls -la
+            exit 1
+          fi
+          echo "dist directory exists:"
+          ls -la dist | head -20
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
