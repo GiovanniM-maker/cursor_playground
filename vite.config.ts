@@ -3,8 +3,16 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  build: { outDir: 'dist' },
-  base: '/cursor_playground/' // IMPORTANTISSIMO per GitHub Pages (usa il nome del repo)
+  build: { 
+    outDir: 'dist'
+  },
+  base: '/cursor_playground/', // IMPORTANTISSIMO per GitHub Pages (usa il nome del repo)
+  // Exclude server directory from processing
+  publicDir: 'public',
+  resolve: {
+    // Don't try to resolve server files
+    alias: {}
+  }
 })
 
 
