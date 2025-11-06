@@ -4,9 +4,11 @@ import { Message, Attachment } from './types'
 import Loader from './Loader'
 import { generateStream } from './api'
 
-function flattenFolders(tree: any[]): { id: string, name: string }[] {
+import { RootTree } from './types'
+
+function flattenFolders(tree: RootTree): { id: string, name: string }[] {
   const out: { id: string, name: string }[] = []
-  const walk = (nodes: any[]) => {
+  const walk = (nodes: RootTree) => {
     for (const n of nodes) {
       if (n.type === 'folder') {
         out.push({ id: n.id, name: n.name })

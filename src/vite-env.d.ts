@@ -1,11 +1,10 @@
 /// <reference types="vite/client" />
 
-interface ImportMetaEnv {
-  readonly VITE_API_URL?: string
-  // più variabili d'ambiente qui se necessario
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv
+// Estendi ImportMetaEnv per le variabili d'ambiente personalizzate
+// Vite già fornisce ImportMeta e ImportMetaEnv, qui aggiungiamo solo le nostre variabili
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_API_URL?: string
+  }
 }
 
