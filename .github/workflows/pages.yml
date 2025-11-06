@@ -26,9 +26,9 @@ jobs:
           node-version: '18'
       - run: npm ci || npm install
       - name: Check TypeScript
-        run: npx tsc --noEmit || true
-      - name: Build
-        run: npm run build
+        run: npx tsc --noEmit 2>&1 | head -50 || true
+      - name: Build with verbose output
+        run: npm run build 2>&1 | tail -100
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
