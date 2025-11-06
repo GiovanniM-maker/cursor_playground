@@ -26,9 +26,10 @@ jobs:
           node-version: '18'
       - run: npm ci || npm install
       - name: Check TypeScript
-        run: npx tsc --noEmit 2>&1 | head -50 || true
+        run: npx tsc --noEmit || true
       - name: Build
         run: npm run build
+        continue-on-error: false
       - name: Verify dist directory
         run: |
           if [ ! -d "dist" ]; then
