@@ -25,7 +25,10 @@ jobs:
         with:
           node-version: '18'
       - run: npm ci || npm install
-      - run: npm run build 2>&1 || (echo "Build failed, showing error:" && npm run build)
+      - name: Check TypeScript
+        run: npx tsc --noEmit || true
+      - name: Build
+        run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
